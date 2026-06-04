@@ -174,14 +174,3 @@ k6 run k6/load-test.js
 | ML scoring latency | <18ms |
 | Reconciliation (10k txns) | ~2.3s |
 
-## What interviewers will ask about this project
-
-**"How does your idempotency work?"** — Redis key `merchant_id:idempotency_key`, 24h TTL, stores full response body. Middleware runs before route handler. Cache miss attaches `storeIdempotencyResult()` helper, which the route calls after successful commit.
-
-**"How do you prevent double-spend?"** — `SELECT FOR UPDATE` on both account rows inside a serializable transaction. Both rows are locked before the balance check. Concurrent request blocks until the first commits.
-
-**"Why double-entry bookkeeping?"** — Every payment creates a debit and a credit. Net sum of all entries must equal 0. This invariant catches bugs and fraud that balance-diff alone misses. It's how every bank in the world accounts.
-
-**"What happens if the ML service is down?"** — 20ms timeout in the Node.js client. On timeout/error: fallback score 0.5 (neutral), payment proceeds, `ml_unavailable` flag stored in transaction. ML is advisory, never a blocker.
-
-**"What does your reconciliation check?"** — 4 things: missing ledger entries, debit≠credit mismatches, global net ≠ 0, stored account balance ≠ computed ledger balance. All discrepancies written to `audit_discrepancies` with full detail.
