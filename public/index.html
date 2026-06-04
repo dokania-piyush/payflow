@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PayFlow — Gateway Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080b10;
+    --bg1:      #0d1117;
+    --bg2:      #141b24;
+    --bg3:      #1c2535;
+    --border:   #1e2d42;
+    --border2:  #253348;
+    --text:     #e2eaf4;
+    --muted:    #5a7a99;
+    --dim:      #2e4560;
+    --green:    #00e5a0;
+    --green-bg: rgba(0,229,160,.08);
+    --red:      #ff4d6a;
+    --red-bg:   rgba(255,77,106,.08);
+    --yellow:   #ffc843;
+    --yellow-bg:rgba(255,200,67,.08);
+    --blue:     #3d9eff;
+    --blue-bg:  rgba(61,158,255,.08);
+    --accent:   #00e5a0;
+  }
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid noise background ── */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,229,160,.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  .shell { position:relative; z-index:1; display:flex; min-height:100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px; flex-shrink:0;
+    background: var(--bg1);
+    border-right: 1px solid var(--border);
+    display:flex; flex-direction:column;
+    padding: 0;
+    position: sticky; top:0; height:100vh;
+  }
+  .logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; gap:10px;
+  }
+  .logo-icon {
+    width:32px; height:32px;
+    background: var(--green);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; color: var(--bg);
+  }
+  .logo-text { font-size:18px; font-weight:800; letter-spacing:-.5px; }
+  .logo-text span { color: var(--green); }
+
+  nav { padding: 16px 12px; flex:1; }
+  .nav-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size:10px; color:var(--muted);
+    letter-spacing:.12em; text-transform:uppercase;
+    padding: 0 8px; margin: 16px 0 6px;
+  }
+  .nav-item {
+    display:flex; align-items:center; gap:10px;
+    padding: 9px 10px; border-radius:8px;
+    cursor:pointer; font-size:14px; font-weight:600;
+    color: var(--muted); transition: all .15s;
+    border: 1px solid transparent;
+    margin-bottom:2px;
+    user-select:none;
+  }
+  .nav-item:hover { color:var(--text); background:var(--bg2); }
+  .nav-item.active {
+    color: var(--green); background: var(--green-bg);
+    border-color: rgba(0,229,160,.15);
+  }
+  .nav-item .icon { font-size:16px; width:18px; text-align:center; }
+  .nav-badge {
+    margin-left:auto; background:var(--red);
+    color:#fff; font-size:10px; font-weight:700;
+    border-radius:10px; padding:1px 6px;
+  }
+
+  .sidebar-footer {
+    padding:16px; border-top:1px solid var(--border);
+  }
+  .merchant-chip {
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:10px; padding:10px 12px;
+    font-size:13px;
+  }
+  .merchant-chip .name { font-weight:700; }
+  .merchant-chip .tag {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px; color:var(--green); margin-top:2px;
+  }
+
+  /* ── Main ── */
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  .topbar {
+    background:var(--bg1); border-bottom:1px solid var(--border);
+    padding:0 28px; height:60px;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;
+  }
+  .page-title { font-size:20px; font-weight:800; }
+  .topbar-right { display:flex; gap:10px; align-items:center; }
+  .status-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:.6; transform:scale(1.3); }
+  }
+  .status-label {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px; color:var(--muted);
+  }
+
+  /* ── Content ── */
+  .content { padding:24px 28px; overflow-y:auto; flex:1; }
+
+  /* ── Auth screen ── */
+  #auth-screen {
+    display:flex; align-items:center; justify-content:center;
+    min-height:calc(100vh - 60px);
+  }
+  .auth-card {
+    background:var(--bg1); border:1px solid var(--border2);
+    border-radius:16px; padding:36px 32px; width:400px;
+    box-shadow:0 0 60px rgba(0,229,160,.04);
+  }
+  .auth-tabs { display:flex; gap:0; margin-bottom:28px; background:var(--bg2); border-radius:10px; padding:4px; }
+  .auth-tab {
+    flex:1; text-align:center; padding:8px;
+    border-radius:8px; cursor:pointer;
+    font-size:13px; font-weight:700; color:var(--muted);
+    transition: all .15s; user-select:none;
+  }
+  .auth-tab.active { background:var(--bg3); color:var(--text); }
+
+  .form-group { margin-bottom:16px; }
+  .form-label {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.08em;
+    display:block; margin-bottom:6px;
+  }
+  .form-input {
+    width:100%; background:var(--bg2); border:1px solid var(--border2);
+    border-radius:8px; padding:10px 14px;
+    font-family:'Syne',sans-serif; font-size:14px; color:var(--text);
+    outline:none; transition:border .15s;
+  }
+  .form-input:focus { border-color:var(--green); }
+  .form-input::placeholder { color:var(--dim); }
+
+  .btn {
+    width:100%; padding:12px;
+    background:var(--green); color:var(--bg);
+    border:none; border-radius:8px;
+    font-family:'Syne',sans-serif; font-size:14px; font-weight:800;
+    cursor:pointer; transition: all .15s;
+    letter-spacing:.02em;
+  }
+  .btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
+  .btn:active { transform:translateY(0); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+  .btn-ghost {
+    background:transparent; color:var(--text);
+    border:1px solid var(--border2);
+  }
+  .btn-ghost:hover { background:var(--bg2); filter:none; }
+  .btn-sm { width:auto; padding:7px 14px; font-size:13px; }
+  .btn-danger { background:var(--red); color:#fff; }
+
+  .error-msg {
+    background:var(--red-bg); border:1px solid rgba(255,77,106,.2);
+    color:var(--red); border-radius:8px; padding:10px 14px;
+    font-size:13px; margin-bottom:16px; display:none;
+  }
+
+  /* ── Stats grid ── */
+  .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+  .stat-card {
+    background:var(--bg1); border:1px solid var(--border);
+    border-radius:12px; padding:20px;
+    transition: border-color .2s;
+    animation: fadeUp .4s ease both;
+  }
+  .stat-card:hover { border-color:var(--border2); }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(10px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .stat-card:nth-child(1) { animation-delay:.0s }
+  .stat-card:nth-child(2) { animation-delay:.07s }
+  .stat-card:nth-child(3) { animation-delay:.14s }
+  .stat-card:nth-child(4) { animation-delay:.21s }
+  .stat-label {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.1em;
+    margin-bottom:10px;
+  }
+  .stat-value { font-size:28px; font-weight:800; }
+  .stat-value.green { color:var(--green); }
+  .stat-value.blue  { color:var(--blue);  }
+  .stat-value.yellow{ color:var(--yellow);}
+  .stat-value.red   { color:var(--red);   }
+  .stat-sub { font-size:12px; color:var(--muted); margin-top:4px; }
+
+  /* ── Panel ── */
+  .panel {
+    background:var(--bg1); border:1px solid var(--border);
+    border-radius:12px; margin-bottom:20px;
+    animation: fadeUp .4s ease .28s both;
+  }
+  .panel-header {
+    padding:16px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .panel-title { font-size:14px; font-weight:700; }
+  .panel-body { padding:20px; }
+
+  /* ── New payment form ── */
+  .pay-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .pay-grid .span2 { grid-column: span 2; }
+
+  /* ── Transactions table ── */
+  .txn-table { width:100%; border-collapse:collapse; }
+  .txn-table th {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.08em;
+    text-align:left; padding:10px 14px;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  .txn-table td {
+    padding:12px 14px; border-bottom:1px solid var(--border);
+    font-size:13px; vertical-align:middle;
+  }
+  .txn-table tr:last-child td { border-bottom:none; }
+  .txn-table tr:hover td { background:var(--bg2); }
+  .txn-id {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px; color:var(--muted);
+  }
+  .amount-cell { font-weight:700; font-size:15px; }
+
+  /* ── Badges ── */
+  .badge {
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:700;
+    padding:3px 9px; border-radius:20px;
+    white-space:nowrap;
+  }
+  .badge::before { content:''; width:5px; height:5px; border-radius:50%; }
+  .badge-green { background:var(--green-bg); color:var(--green); }
+  .badge-green::before { background:var(--green); }
+  .badge-red { background:var(--red-bg); color:var(--red); }
+  .badge-red::before { background:var(--red); }
+  .badge-yellow { background:var(--yellow-bg); color:var(--yellow); }
+  .badge-yellow::before { background:var(--yellow); }
+  .badge-blue { background:var(--blue-bg); color:var(--blue); }
+  .badge-blue::before { background:var(--blue); }
+
+  /* ── Risk score bar ── */
+  .risk-wrap { display:flex; align-items:center; gap:8px; }
+  .risk-bar { flex:1; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden; min-width:60px; }
+  .risk-fill { height:100%; border-radius:2px; transition:width .3s; }
+  .risk-val { font-family:'IBM Plex Mono',monospace; font-size:11px; width:36px; text-align:right; }
+
+  /* ── Ledger view ── */
+  .ledger-entry {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0; border-bottom:1px solid var(--border);
+    font-size:13px;
+  }
+  .ledger-entry:last-child { border-bottom:none; }
+  .ledger-type { font-weight:700; }
+  .ledger-type.debit  { color:var(--red); }
+  .ledger-type.credit { color:var(--green); }
+
+  /* ── Toast ── */
+  #toast {
+    position:fixed; bottom:24px; right:24px;
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:10px; padding:12px 18px;
+    font-size:13px; font-weight:600;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);
+    transform:translateY(20px); opacity:0;
+    transition:all .25s; z-index:100;
+    max-width:320px;
+  }
+  #toast.show { transform:translateY(0); opacity:1; }
+  #toast.success { border-color:rgba(0,229,160,.3); color:var(--green); }
+  #toast.error   { border-color:rgba(255,77,106,.3); color:var(--red);   }
+
+  /* ── Loader ── */
+  .spinner {
+    width:16px; height:16px;
+    border:2px solid transparent;
+    border-top-color:currentColor;
+    border-radius:50%;
+    animation:spin .6s linear infinite;
+    display:inline-block;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Account card ── */
+  .account-card {
+    background:var(--bg2); border:1px solid var(--border2);
+    border-radius:10px; padding:16px 18px;
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .account-card:last-child { margin-bottom:0; }
+  .acct-id { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); margin-top:3px; }
+  .acct-balance { font-size:22px; font-weight:800; color:var(--green); }
+  .copy-btn {
+    background:none; border:1px solid var(--border2);
+    color:var(--muted); border-radius:6px; padding:4px 8px;
+    font-size:11px; cursor:pointer; transition:all .15s;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .copy-btn:hover { color:var(--text); border-color:var(--border2); background:var(--bg3); }
+
+  /* ── Recon ── */
+  .recon-stat {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 0; border-bottom:1px solid var(--border);
+    font-size:14px;
+  }
+  .recon-stat:last-child { border-bottom:none; }
+  .recon-stat .val { font-weight:700; }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align:center; padding:40px 20px;
+    color:var(--muted); font-size:14px;
+  }
+  .empty .icon { font-size:32px; margin-bottom:10px; }
+
+  /* ── Tabs ── */
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.1em;
+    margin-bottom:12px;
+  }
+
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div id="auth-screen" class="content">
+  <div class="auth-card">
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="font-size:36px; margin-bottom:4px;">⚡</div>
+      <div style="font-size:22px; font-weight:800;">Pay<span style="color:var(--green)">Flow</span></div>
+      <div style="font-size:13px; color:var(--muted); margin-top:4px;">Gateway Dashboard</div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchAuthTab('login')">Login</div>
+      <div class="auth-tab" onclick="switchAuthTab('register')">Register</div>
+    </div>
+    <div id="auth-error" class="error-msg"></div>
+
+    <!-- Login -->
+    <div id="tab-login">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="login-email" type="email" placeholder="merchant@example.com"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="login-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <button class="btn" onclick="doLogin()" id="login-btn">Sign In</button>
+    </div>
+
+    <!-- Register -->
+    <div id="tab-register" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Business Name</label>
+        <input class="form-input" id="reg-name" placeholder="Acme Corp"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="reg-email" type="email" placeholder="admin@acme.com"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="reg-password" type="password" placeholder="Min 8 characters" onkeydown="if(event.key==='Enter')doRegister()"/>
+      </div>
+      <button class="btn" onclick="doRegister()" id="register-btn">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main shell (hidden until login) ── -->
+<div class="shell" id="app-shell" style="display:none">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">Pay<span>Flow</span></div>
+    </div>
+    <nav>
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" onclick="showView('dashboard')">
+        <span class="icon">◈</span> Dashboard
+      </div>
+      <div class="nav-label">Payments</div>
+      <div class="nav-item" onclick="showView('send')">
+        <span class="icon">↗</span> Send Payment
+      </div>
+      <div class="nav-item" onclick="showView('transactions')">
+        <span class="icon">≡</span> Transactions
+      </div>
+      <div class="nav-label">Finance</div>
+      <div class="nav-item" onclick="showView('accounts')">
+        <span class="icon">◎</span> Accounts
+      </div>
+      <div class="nav-item" onclick="showView('reconciliation')">
+        <span class="icon">⊞</span> Reconciliation
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="merchant-chip">
+        <div class="name" id="sidebar-name">—</div>
+        <div class="tag">● LIVE</div>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:10px;font-size:12px;padding:8px;" onclick="logout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="topbar-right">
+        <div class="status-dot"></div>
+        <span class="status-label">API CONNECTED</span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── Dashboard view ── -->
+      <div class="view active" id="view-dashboard">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-label">Total Transactions</div><div class="stat-value blue" id="stat-total">—</div><div class="stat-sub">All time</div></div>
+          <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value green" id="stat-completed">—</div><div class="stat-sub">Successfully processed</div></div>
+          <div class="stat-card"><div class="stat-label">Held for Review</div><div class="stat-value yellow" id="stat-pending">—</div><div class="stat-sub">High risk score</div></div>
+          <div class="stat-card"><div class="stat-label">Total Volume</div><div class="stat-value green" id="stat-volume">—</div><div class="stat-sub">INR processed</div></div>
+        </div>
+
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Recent Transactions</div>
+              <button class="btn btn-ghost btn-sm" onclick="showView('transactions')">View all</button>
+            </div>
+            <div class="panel-body" id="recent-txns" style="padding:0">
+              <div class="empty"><div class="icon">📭</div>No transactions yet</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Accounts</div></div>
+            <div class="panel-body" id="dash-accounts">
+              <div class="empty"><div class="icon">🏦</div>Loading...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Send Payment view ── -->
+      <div class="view" id="view-send">
+        <div class="panel" style="max-width:600px">
+          <div class="panel-header"><div class="panel-title">New Payment</div></div>
+          <div class="panel-body">
+            <div id="pay-error" class="error-msg"></div>
+            <div class="pay-grid">
+              <div class="form-group">
+                <label class="form-label">From Account</label>
+                <select class="form-input" id="pay-sender">
+                  <option value="">Select account...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">To Account ID</label>
+                <input class="form-input" id="pay-receiver" placeholder="Receiver UUID"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Amount (INR)</label>
+                <input class="form-input" id="pay-amount" type="number" min="1" placeholder="1000.00"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Idempotency Key</label>
+                <div style="display:flex;gap:8px">
+                  <input class="form-input" id="pay-idem" placeholder="Auto-generated"/>
+                  <button class="copy-btn" onclick="genIdem()" style="white-space:nowrap">New</button>
+                </div>
+              </div>
+              <div class="form-group span2">
+                <label class="form-label">Description</label>
+                <input class="form-input" id="pay-desc" placeholder="Invoice #001"/>
+              </div>
+            </div>
+            <button class="btn" onclick="sendPayment()" id="pay-btn">Process Payment →</button>
+
+            <div id="pay-result" style="display:none;margin-top:20px;">
+              <div class="section-label">Transaction Result</div>
+              <div id="pay-result-body" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;color:var(--text);max-height:300px;overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Transactions view ── -->
+      <div class="view" id="view-transactions">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">All Transactions</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select class="form-input" id="txn-filter" style="width:140px;padding:7px 10px;font-size:13px" onchange="loadTransactions()">
+                <option value="">All status</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+                <option value="reversed">Reversed</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="loadTransactions()">↻ Refresh</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="txn-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Risk Score</th>
+                  <th>Description</th>
+                  <th>Time</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="txn-tbody">
+                <tr><td colspan="7"><div class="empty">Loading...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Accounts view ── -->
+      <div class="view" id="view-accounts">
+        <div class="panel" style="max-width:700px">
+          <div class="panel-header">
+            <div class="panel-title">My Accounts</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)">Tap ID to copy</div>
+          </div>
+          <div class="panel-body" id="accounts-list">
+            <div class="empty">Loading...</div>
+          </div>
+        </div>
+
+        <div class="panel" style="max-width:700px" id="ledger-panel" style="display:none">
+          <div class="panel-header">
+            <div class="panel-title">Ledger — <span id="ledger-acct-label" style="color:var(--muted);font-weight:400;font-size:13px">select an account above</span></div>
+            <button class="btn btn-ghost btn-sm" onclick="loadLedger(currentLedgerAcct)">↻</button>
+          </div>
+          <div class="panel-body" id="ledger-entries" style="padding:0 20px">
+            <div class="empty">Select an account to view ledger</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Reconciliation view ── -->
+      <div class="view" id="view-reconciliation">
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Run Reconciliation</div></div>
+            <div class="panel-body">
+              <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
+                Runs 4 integrity checks on all completed transactions:<br>
+                ledger entry count · debit/credit balance · global net zero · account balance vs computed
+              </p>
+              <button class="btn" onclick="runRecon()" id="recon-btn">Run Now →</button>
+              <div id="recon-result" style="display:none;margin-top:20px;"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Past Reports</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadReconReports()">↻</button>
+            </div>
+            <div class="panel-body" id="recon-reports" style="padding:0 20px">
+              <div class="empty">No reports yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<div id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const API = 'http://localhost:3000';
+let TOKEN = localStorage.getItem('pf_token') || '';
+let MERCHANT = JSON.parse(localStorage.getItem('pf_merchant') || 'null');
+let currentLedgerAcct = null;
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+if (TOKEN && MERCHANT) {
+  showApp();
+}
+
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+function switchAuthTab(t) {
+  document.querySelectorAll('.auth-tab').forEach((el,i) => el.classList.toggle('active', (i===0&&t==='login')||(i===1&&t==='register')));
+  document.getElementById('tab-login').style.display = t==='login' ? '' : 'none';
+  document.getElementById('tab-register').style.display = t==='register' ? '' : 'none';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function doRegister() {
+  const btn = document.getElementById('register-btn');
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  setLoading(btn, true);
+  hideAuthError();
+  try {
+    const r = await api('/auth/register','POST',{name,email,password});
+    showToast('Account created — please sign in','success');
+    switchAuthTab('login');
+    document.getElementById('login-email').value = email;
+  } catch(e) { showAuthError(e.message); }
+  finally { setLoading(btn, false, 'Create Account'); }
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  setLoading(btn, true);
+  hideAuthError();
+  try {
+    const r = await api('/auth/login','POST',{email,password});
+    TOKEN = r.token;
+    MERCHANT = r.merchant;
+    localStorage.setItem('pf_token', TOKEN);
+    localStorage.setItem('pf_merchant', JSON.stringify(MERCHANT));
+    showApp();
+  } catch(e) { showAuthError(e.message); }
+  finally { setLoading(btn, false, 'Sign In'); }
+}
+
+function logout() {
+  TOKEN = ''; MERCHANT = null;
+  localStorage.removeItem('pf_token');
+  localStorage.removeItem('pf_merchant');
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideAuthError() {
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+// ── App bootstrap ─────────────────────────────────────────────────────────────
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'flex';
+  document.getElementById('sidebar-name').textContent = MERCHANT.name;
+  showView('dashboard');
+}
+
+// ── View routing ──────────────────────────────────────────────────────────────
+const viewTitles = {
+  dashboard: 'Dashboard', send: 'Send Payment',
+  transactions: 'Transactions', accounts: 'Accounts',
+  reconciliation: 'Reconciliation'
+};
+
+function showView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if (el.textContent.trim().toLowerCase().includes(v==='send'?'send':v==='dashboard'?'dashboard':v==='transactions'?'transaction':v==='accounts'?'account':v)) {
+      el.classList.add('active');
+    }
+  });
+  document.getElementById('page-title').textContent = viewTitles[v] || v;
+  if (v==='dashboard')      loadDashboard();
+  if (v==='transactions')   loadTransactions();
+  if (v==='accounts')       loadAccounts();
+  if (v==='reconciliation') loadReconReports();
+  if (v==='send')           loadSendForm();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [txnsR, acctR] = await Promise.all([
+      api('/payments?limit=100'),
+      api('/accounts'),
+    ]);
+    const txns = txnsR.transactions || [];
+    const completed = txns.filter(t=>t.status==='completed');
+    const pending   = txns.filter(t=>t.status==='pending');
+    const volume    = completed.reduce((s,t)=>s+parseFloat(t.amount),0);
+
+    document.getElementById('stat-total').textContent     = txns.length;
+    document.getElementById('stat-completed').textContent = completed.length;
+    document.getElementById('stat-pending').textContent   = pending.length;
+    document.getElementById('stat-volume').textContent    = '₹' + volume.toLocaleString('en-IN',{maximumFractionDigits:0});
+
+    // Recent 5 transactions
+    const recent = txns.slice(0,5);
+    const tbody = document.getElementById('recent-txns');
+    if (!recent.length) {
+      tbody.innerHTML = '<div class="empty"><div class="icon">📭</div>No transactions yet</div>';
+    } else {
+      tbody.innerHTML = recent.map(t => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">${t.description||'—'}</div>
+            <div class="txn-id">${t.id.slice(0,16)}…</div>
+          </div>
+          <div style="text-align:right">
+            <div class="amount-cell" style="color:var(--green)">₹${parseFloat(t.amount).toLocaleString('en-IN')}</div>
+            <div style="margin-top:4px">${statusBadge(t.status)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Accounts
+    const accounts = acctR.accounts || [];
+    document.getElementById('dash-accounts').innerHTML = accounts.map(a => `
+      <div class="account-card">
+        <div>
+          <div style="font-size:13px;font-weight:700">${a.currency} Account</div>
+          <div class="acct-id">${a.id.slice(0,20)}…</div>
+        </div>
+        <div class="acct-balance">₹${parseFloat(a.balance).toLocaleString('en-IN')}</div>
+      </div>
+    `).join('') || '<div class="empty">No accounts found</div>';
+
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+async function loadTransactions() {
+  const status = document.getElementById('txn-filter').value;
+  const tbody = document.getElementById('txn-tbody');
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><span class="spinner"></span></div></td></tr>';
+  try {
+    const r = await api('/payments?limit=50' + (status?'&status='+status:''));
+    const txns = r.transactions || [];
+    if (!txns.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="icon">📭</div>No transactions</div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = txns.map(t => {
+      const score = parseFloat(t.risk_score)||0;
+      const scoreColor = score < 0.3 ? 'var(--green)' : score < 0.7 ? 'var(--yellow)' : 'var(--red)';
+      return `<tr>
+        <td><div class="txn-id">${t.id.slice(0,12)}…</div></td>
+        <td><div class="amount-cell">₹${parseFloat(t.amount).toLocaleString('en-IN')}</div></td>
+        <td>${statusBadge(t.status)}</td>
+        <td>
+          <div class="risk-wrap">
+            <div class="risk-bar"><div class="risk-fill" style="width:${(score*100).toFixed(0)}%;background:${scoreColor}"></div></div>
+            <div class="risk-val" style="color:${scoreColor}">${score.toFixed(3)}</div>
+          </div>
+        </td>
+        <td style="color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'—'}</td>
+        <td style="color:var(--muted);font-size:12px">${fmtDate(t.created_at)}</td>
+        <td>
+          ${t.status==='completed' ? `<button class="copy-btn" onclick="openReverse('${t.id}')">Reverse</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty">${e.message}</div></td></tr>`; }
+}
+
+// ── Accounts ──────────────────────────────────────────────────────────────────
+async function loadAccounts() {
+  try {
+    const r = await api('/accounts');
+    const accounts = r.accounts || [];
+    const select = document.getElementById('pay-sender');
+    select.innerHTML = '<option value="">Select account...</option>' +
+      accounts.map(a=>`<option value="${a.id}">${a.currency} — ₹${parseFloat(a.balance).toLocaleString('en-IN')} (${a.id.slice(0,8)}…)</option>`).join('');
+
+    document.getElementById('accounts-list').innerHTML = accounts.map(a => `
+      <div class="account-card" style="cursor:pointer" onclick="loadLedger('${a.id}','${a.id.slice(0,16)}…')">
+        <div>
+          <div style="font-size:14px;font-weight:700">${a.currency} Account</div>
+          <div class="acct-id" id="acct-id-${a.id}">${a.id}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Tap to view ledger →</div>
+        </div>
+        <div>
+          <div class="acct-balance">₹${parseFloat(a.balance).toLocaleString('en-IN')}</div>
+          <button class="copy-btn" style="margin-top:6px;float:right" onclick="event.stopPropagation();copyText('${a.id}')">Copy ID</button>
+        </div>
+      </div>
+    `).join('') || '<div class="empty">No accounts</div>';
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+async function loadLedger(acctId, label) {
+  currentLedgerAcct = acctId;
+  document.getElementById('ledger-acct-label').textContent = label || acctId.slice(0,20)+'…';
+  document.getElementById('ledger-entries').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+  try {
+    const r = await api('/accounts/'+acctId+'/ledger');
+    const entries = r.ledger || [];
+    if (!entries.length) {
+      document.getElementById('ledger-entries').innerHTML = '<div class="empty">No ledger entries yet</div>';
+      return;
+    }
+    document.getElementById('ledger-entries').innerHTML = entries.map(e => `
+      <div class="ledger-entry">
+        <div>
+          <span class="ledger-type ${e.entry_type}">${e.entry_type.toUpperCase()}</span>
+          <span style="color:var(--muted);font-size:12px;margin-left:8px">${e.description||'—'}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700;color:${e.entry_type==='credit'?'var(--green)':'var(--red)'}">
+            ${e.entry_type==='credit'?'+':'−'}₹${parseFloat(e.amount).toLocaleString('en-IN')}
+          </div>
+          <div style="font-size:11px;color:var(--muted)">Bal: ₹${parseFloat(e.running_balance).toLocaleString('en-IN')}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { document.getElementById('ledger-entries').innerHTML = `<div class="empty">${e.message}</div>`; }
+}
+
+// ── Send payment ──────────────────────────────────────────────────────────────
+async function loadSendForm() {
+  await loadAccounts();
+  genIdem();
+}
+
+function genIdem() {
+  document.getElementById('pay-idem').value = 'pay-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
+}
+
+async function sendPayment() {
+  const btn = document.getElementById('pay-btn');
+  const sender   = document.getElementById('pay-sender').value;
+  const receiver = document.getElementById('pay-receiver').value.trim();
+  const amount   = document.getElementById('pay-amount').value;
+  const idem     = document.getElementById('pay-idem').value.trim();
+  const desc     = document.getElementById('pay-desc').value.trim();
+
+  document.getElementById('pay-error').style.display = 'none';
+  document.getElementById('pay-result').style.display = 'none';
+
+  if (!sender || !receiver || !amount || !idem) {
+    document.getElementById('pay-error').textContent = 'Please fill in all required fields';
+    document.getElementById('pay-error').style.display = 'block';
+    return;
+  }
+
+  setLoading(btn, true);
+  try {
+    const r = await fetch(API+'/payments', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+TOKEN,
+        'Idempotency-Key': idem,
+      },
+      body: JSON.stringify({
+        sender_account_id: sender,
+        receiver_account_id: receiver,
+        amount: parseFloat(amount),
+        currency: 'INR',
+        description: desc || 'Payment from dashboard',
+      })
+    });
+    const data = await r.json();
+    document.getElementById('pay-result').style.display = 'block';
+    document.getElementById('pay-result-body').textContent = JSON.stringify(data, null, 2);
+    if (r.ok) {
+      showToast(data.held_for_review ? '⚠ Payment held for review (high risk score)' : '✓ Payment processed successfully', data.held_for_review ? 'error' : 'success');
+      genIdem();
+    } else {
+      throw new Error(data.error || 'Payment failed');
+    }
+  } catch(e) {
+    document.getElementById('pay-error').textContent = e.message;
+    document.getElementById('pay-error').style.display = 'block';
+    showToast(e.message, 'error');
+  }
+  setLoading(btn, false, 'Process Payment →');
+}
+
+// ── Reverse ───────────────────────────────────────────────────────────────────
+async function openReverse(txnId) {
+  const reason = prompt('Reason for reversal:');
+  if (!reason) return;
+  try {
+    await api('/payments/'+txnId+'/reverse','POST',{reason});
+    showToast('Transaction reversed','success');
+    loadTransactions();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+// ── Reconciliation ────────────────────────────────────────────────────────────
+async function runRecon() {
+  const btn = document.getElementById('recon-btn');
+  setLoading(btn, true);
+  document.getElementById('recon-result').style.display = 'none';
+  try {
+    const r = await api('/accounts/reconciliation/run','POST');
+    const report = r.report;
+    const isClean = report.status === 'clean';
+    document.getElementById('recon-result').style.display = 'block';
+    document.getElementById('recon-result').innerHTML = `
+      <div style="background:var(--bg2);border:1px solid ${isClean?'rgba(0,229,160,.2)':'rgba(255,77,106,.2)'};border-radius:10px;padding:16px">
+        <div style="font-weight:700;font-size:15px;color:${isClean?'var(--green)':'var(--red)'};margin-bottom:12px">
+          ${isClean ? '✓ Ledger is clean' : '⚠ Discrepancies found'}
+        </div>
+        <div class="recon-stat"><span>Total transactions</span><span class="val">${report.totalTxns}</span></div>
+        <div class="recon-stat"><span>Matched</span><span class="val" style="color:var(--green)">${report.matched}</span></div>
+        <div class="recon-stat"><span>Mismatches</span><span class="val" style="color:${report.mismatches>0?'var(--red)':'var(--text)'}">${report.mismatches}</span></div>
+        <div class="recon-stat"><span>Discrepancy amount</span><span class="val" style="color:${report.discrepancyAmt>0?'var(--red)':'var(--text)'}">₹${parseFloat(report.discrepancyAmt||0).toFixed(2)}</span></div>
+      </div>
+    `;
+    showToast(isClean ? '✓ Reconciliation clean' : '⚠ Discrepancies detected', isClean ? 'success' : 'error');
+    loadReconReports();
+  } catch(e) { showToast(e.message,'error'); }
+  setLoading(btn, false, 'Run Now →');
+}
+
+async function loadReconReports() {
+  try {
+    const r = await api('/accounts/reconciliation/reports');
+    const reports = r.reports || [];
+    if (!reports.length) {
+      document.getElementById('recon-reports').innerHTML = '<div class="empty">No reports yet. Run reconciliation above.</div>';
+      return;
+    }
+    document.getElementById('recon-reports').innerHTML = reports.slice(0,10).map(r => `
+      <div class="ledger-entry">
+        <div>
+          <div style="font-size:13px;font-weight:600">${fmtDate(r.created_at)}</div>
+          <div style="font-size:11px;color:var(--muted)">${r.total_txns} transactions · ${r.mismatches} mismatches</div>
+        </div>
+        <span class="badge ${r.status==='clean'?'badge-green':'badge-red'}">${r.status==='clean'?'Clean':'Issues'}</span>
+      </div>
+    `).join('');
+  } catch(e) { /* silent */ }
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type':'application/json', ...(TOKEN ? {'Authorization':'Bearer '+TOKEN} : {}) }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API+path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || data.errors?.[0]?.msg || 'Request failed');
+  return data;
+}
+
+function statusBadge(s) {
+  const map = { completed:'green', pending:'yellow', failed:'red', reversed:'blue', processing:'blue' };
+  return `<span class="badge badge-${map[s]||'blue'}">${s}</span>`;
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + ' ' +
+         d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard','success'));
+}
+
+function setLoading(btn, loading, label) {
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span>' : (label||btn.textContent);
+}
+
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.className = ''; }, 3500);
+}
+</script>
+</body>
+</html>
