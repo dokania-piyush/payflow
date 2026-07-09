@@ -7,9 +7,9 @@ const seed = async () => {
 
   const adminHash = await bcrypt.hash('admin123', 12);
   const adminRes = await query(
-    `INSERT INTO merchants (name, email, password_hash)
-     VALUES ($1,$2,$3)
-     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+    `INSERT INTO merchants (name, email, password_hash, role)
+     VALUES ($1,$2,$3,'admin')
+     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = 'admin'
      RETURNING id, email`,
     ['Admin', 'admin@payflow.com', adminHash]
   );

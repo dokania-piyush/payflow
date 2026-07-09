@@ -28,14 +28,14 @@ router.post('/',
         return res.status(400).json({ error: 'Sender and receiver cannot be the same account' });
       }
 
-      // Verify the sender account belongs to this merchant
+      // Verify the merchant is either the sender or the receiver
       const accountCheck = await query(
-        'SELECT id FROM accounts WHERE id = $1 AND merchant_id = $2',
-        [sender_account_id, req.merchant.id]
+        'SELECT id FROM accounts WHERE id IN ($1, $2) AND merchant_id = $3',
+        [sender_account_id, receiver_account_id, req.merchant.id]
       );
 
       if (!accountCheck.rows.length) {
-        return res.status(403).json({ error: 'Sender account does not belong to this merchant' });
+        return res.status(403).json({ error: 'Merchant must own either the sender or receiver account' });
       }
 
       const result = await processPayment({

@@ -3,10 +3,13 @@ const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
 const paymentRoutes = require('./routes/payments');
 const accountRoutes = require('./routes/accounts');
+const analyticsRoutes = require('./routes/analytics');
+const adminRoutes = require('./routes/admin');
 const { errorHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 
@@ -14,6 +17,7 @@ const app = express();
 
 // Security headers
 app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors());
 
 // Request logging
 app.use(morgan('combined', {
@@ -56,6 +60,8 @@ app.get('/health', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/accounts', accountRoutes);
+app.use('/analytics', analyticsRoutes);
+app.use('/admin', adminRoutes);
 
 // 404
 app.use((req, res) => {

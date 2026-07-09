@@ -1,176 +1,120 @@
-# PayFlow — Distributed Payment Gateway
+# 🚀 PayFlow - Enterprise Payment Gateway Architecture
 
-A production-grade payment gateway API demonstrating distributed systems design patterns used in fintech (JPMC, Stripe, Razorpay).
+PayFlow is a full-stack, enterprise-grade **Payment Gateway & Ledger System** designed to handle high-volume B2B2C financial transactions safely and reliably. 
 
-## Architecture
+Built with modern architecture patterns used by companies like Stripe and Razorpay, PayFlow includes robust features like **Double-Entry Bookkeeping**, **Idempotent API Requests**, **Machine Learning Fraud Detection**, and **Asynchronous Webhooks**.
 
-```
-Client → API Gateway → Idempotency Layer (Redis)
-                     → Payment Processor (PostgreSQL ACID)
-                           → Ledger Service (double-entry)
-                           → ML Fraud Scorer (Python/scikit-learn, <20ms)
-                           → Job Queue (BullMQ) → Webhook Dispatcher
-                     → Reconciliation Engine (nightly cron)
-```
+![PayFlow Banner](https://img.shields.io/badge/Status-Production%20Ready-success) ![License](https://img.shields.io/badge/License-MIT-blue)
 
-## Key Design Decisions
+---
 
-### 1. Idempotency (Redis)
-Every mutating request requires an `Idempotency-Key` header. Redis stores the response for 24 hours. Duplicate requests return the cached response instantly — no DB hit, no double charge.
+## 🏗 Architecture Overview
 
-### 2. Double-spend prevention (PostgreSQL `FOR UPDATE`)
-The payment processor uses `SELECT FOR UPDATE` to lock both account rows before any balance check. Only one concurrent transaction wins; others roll back with a conflict. This is the database-level guarantee against race conditions.
+PayFlow operates on a **B2B2C** (Business-to-Business-to-Consumer) model. 
 
-### 3. Double-entry bookkeeping
-Every payment creates exactly 2 ledger rows: one DEBIT (sender loses money) and one CREDIT (receiver gains money). The sum of all ledger entries must always equal 0 — this invariant is checked nightly by the reconciliation engine.
+1. **The Merchant (e.g., Zomato, Amazon):** Integrates the PayFlow REST API into their backend.
+2. **The Customer:** Buys a product on the Merchant's website.
+3. **PayFlow API:** The Merchant's server securely hits PayFlow's `POST /payments` endpoint to transfer funds from the Customer to the Merchant.
+4. **The Ledger:** PayFlow uses strict **double-entry bookkeeping** (debits and credits) to ensure money is never created or destroyed out of thin air.
+5. **Machine Learning:** Every transaction is synchronously analyzed by a Python microservice to detect anomalous/fraudulent patterns.
+6. **Webhooks:** PayFlow asynchronously notifies the Merchant's server via Redis queues that the payment was successful.
 
-### 4. ML Fraud Scoring
-A Python/Flask microservice exposes `POST /score`. The Node.js gateway calls it synchronously before committing, with a 20ms timeout. ML failure → fallback score of 0.5 (payment continues). Score >0.85 → transaction held for review (not auto-blocked — regulatory requirement for explainability).
+---
 
-### 5. Async Webhooks (BullMQ)
-Merchant notifications are enqueued AFTER the DB transaction commits. Exponential backoff: 1s → 2s → 4s → 8s → 16s. After 5 failures → dead-letter queue for human review.
+## 💻 Tech Stack
 
-### 6. Reconciliation
-Nightly cron (2:00 AM IST) checks:
-- Every completed transaction has exactly 2 ledger entries
-- Debit amount == Credit amount per transaction  
-- Global net sum of all ledger entries == 0
-- Account stored balances match computed balances from ledger history
+### Frontend (Dashboards & UI)
+- **React 19 & Vite:** Lightning-fast frontend tooling.
+- **Tailwind CSS v4:** Modern, utility-first styling.
+- **Recharts:** Dynamic data visualization for revenue metrics.
+- **Lucide React:** Clean, professional iconography.
 
-## Quick Start
+### Backend (Core Engine)
+- **Node.js & Express:** High-performance REST API.
+- **PostgreSQL (Neon):** ACID-compliant relational database for absolute data integrity.
+- **Redis:** In-memory data store for Webhook Job Queues and Rate Limiting.
+- **JSON Web Tokens (JWT):** Secure Role-Based Access Control (RBAC).
+
+### Microservices
+- **Python & Flask:** Dedicated ML service for real-time transaction risk scoring (Fraud Detection).
+
+---
+
+## ✨ Key Enterprise Features
+
+* 🏦 **Double-Entry Ledger Bookkeeping:** Every transaction creates a synchronized debit and credit entry. An automated reconciliation worker runs in the background to audit the database for discrepancies.
+* 🛡️ **Idempotent API:** Safe against network failures. If a merchant accidentally sends the same payment request twice, the Idempotency middleware intercepts it and returns the cached result, preventing double-charging.
+* 🤖 **AI Fraud Detection:** A Python microservice assigns a risk score (0.0 to 1.0) to every transaction. High-risk transactions (>0.85) are automatically blocked or flagged for manual Admin review.
+* 🎣 **Reliable Webhooks:** Failed webhook deliveries to merchants are pushed to a Redis Queue with an exponential backoff retry strategy.
+* 👥 **Role-Based Access Control:** Separate JWT permissions for **Admins** (who manage the system and freeze accounts) and **Merchants** (who process payments).
+
+---
+
+## 🖥️ User Interfaces
+
+PayFlow includes three distinct frontends to demonstrate the complete ecosystem:
+
+1. **B2C Demo E-commerce Store (`/demo-store`)**
+   - Simulates a real customer checkout experience on a merchant's website. Features a sleek PayFlow Checkout Widget overlay that processes live transactions.
+
+2. **Merchant Dashboard (`/merchant`)**
+   - The analytics hub for businesses. Displays Total Revenue, Transactions Today, Success/Failure rates, and interactive volume charts.
+
+3. **Admin Control Center (`/admin`)**
+   - The internal tool for PayFlow staff. Allows admins to monitor database/queue health, view global flagged transactions, and freeze/unfreeze malicious merchant accounts.
+
+---
+
+## 🛠️ How to Run Locally
 
 ### Prerequisites
-- Node.js 20+
-- Docker + Docker Compose
-- Python 3.11+ (for ML service standalone)
+- Docker & Docker Compose
+- Node.js (v20+)
 
-### With Docker (recommended)
+### 1. Start the Backend Infrastructure
+The backend relies on Docker to spin up the Node API, Python ML Service, and Redis.
 ```bash
-git clone <repo>
-cd payflow
-docker-compose up
+docker-compose up -d --build
+```
+*(Note: Ensure your `DATABASE_URL` is set in your `.env` file pointing to your PostgreSQL instance).*
+
+### 2. Seed the Database
+Run the seed script to create the default Admin and Merchant accounts.
+```bash
+npm run seed
 ```
 
-API: http://localhost:3000  
-ML Service: http://localhost:5001
-
-### Without Docker
+### 3. Start the React Frontend
 ```bash
-# 1. Start PostgreSQL and Redis locally
-# 2. Apply schema
-psql -d payflow -f schema.sql
-
-# 3. Install Node dependencies
+cd frontend
 npm install
-
-# 4. Configure environment
-cp .env.example .env
-# Edit .env with your DB credentials
-
-# 5. Start ML service
-cd ml-service
-pip install -r requirements.txt
-python app.py &
-cd ..
-
-# 6. Start API
 npm run dev
-
-# 7. Start workers (separate terminals)
-npm run worker
-npm run reconcile
 ```
 
-## API Reference
+### 4. Access the App
+Open **http://localhost:5173** in your browser.
+- **Admin Login:** `admin@payflow.com` / `admin123`
+- **Merchant Login:** `demo@acme.com` / `demo1234`
 
-### Authentication
-All endpoints except `/auth/*` require `Authorization: Bearer <token>`.
+---
 
-### POST /auth/register
-```json
-{
-  "name": "Acme Corp",
-  "email": "admin@acme.com",
-  "password": "SecurePass123!",
-  "webhook_url": "https://acme.com/webhooks/payflow"
-}
+## 📂 Project Structure
+
+```
+payflow/
+├── frontend/                 # React UI (Dashboards & B2C Demo)
+├── ml-service/               # Python Flask Fraud Detection Microservice
+├── src/
+│   ├── config/               # Database and environment configurations
+│   ├── middleware/           # Auth, Idempotency, and Error Handling
+│   ├── routes/               # Express API endpoints
+│   ├── services/             # Core business logic (Payments, Ledger)
+│   ├── utils/                # Logging and helper functions
+│   └── workers/              # Redis Webhook and Reconciliation workers
+├── schema.sql                # PostgreSQL Database Schema
+└── docker-compose.yml        # Infrastructure orchestration
 ```
 
-### POST /auth/login
-```json
-{ "email": "admin@acme.com", "password": "SecurePass123!" }
-```
-Returns: `{ "token": "eyJ..." }`
+---
 
-### POST /payments
-Headers: `Authorization: Bearer <token>`, `Idempotency-Key: <unique-key>`
-```json
-{
-  "sender_account_id": "uuid",
-  "receiver_account_id": "uuid",
-  "amount": 1500.00,
-  "currency": "INR",
-  "description": "Invoice #INV-2024-001"
-}
-```
-Response (201):
-```json
-{
-  "transaction": {
-    "id": "uuid",
-    "status": "completed",
-    "amount": "1500.00",
-    "risk_score": "0.043",
-    "risk_flags": []
-  },
-  "held_for_review": false
-}
-```
-Returns **202** if risk_score > 0.85 (held for review).  
-Returns **cached response** with `X-Idempotency-Hit: true` on duplicate key.
-
-### GET /payments/:id
-Returns transaction with full ledger entries.
-
-### GET /payments?page=1&limit=20&status=completed
-Paginated transaction list.
-
-### POST /payments/:id/reverse
-```json
-{ "reason": "Customer request — duplicate charge" }
-```
-
-### GET /accounts
-Returns accounts with stored balance and computed ledger balance side-by-side.
-
-### GET /accounts/:id/ledger
-Full ledger history with running balances.
-
-### POST /accounts/reconciliation/run
-Triggers reconciliation for the last 24 hours. Returns full discrepancy report.
-
-## Running Tests
-```bash
-npm test
-# With coverage
-npm run test:coverage
-```
-
-Tests cover: auth, payment processing, idempotency dedup, insufficient funds, ledger integrity (2 entries per txn, debit==credit), reconciliation.
-
-## Load Testing (k6)
-```bash
-# Install k6: https://k6.io/docs/getting-started/installation/
-k6 run k6/load-test.js
-# Reports P95 latency, error rate, throughput
-```
-
-## Performance (local, unoptimized)
-| Metric | Result |
-|---|---|
-| P95 latency (payment) | ~140ms |
-| Concurrent users | 1,000+ |
-| Idempotency cache hit | <5ms |
-| ML scoring latency | <18ms |
-| Reconciliation (10k txns) | ~2.3s |
-
+*Designed & Engineered as a robust demonstration of FinTech architecture.*

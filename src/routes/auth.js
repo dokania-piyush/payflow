@@ -28,9 +28,9 @@ router.post('/register',
       const passwordHash = await bcrypt.hash(password, 12);
 
       const merchantRes = await query(
-        `INSERT INTO merchants (name, email, password_hash, webhook_url)
-         VALUES ($1,$2,$3,$4) RETURNING id, name, email, webhook_url, created_at`,
-        [name, email, passwordHash, webhook_url || null]
+        `INSERT INTO merchants (name, email, password_hash, role, webhook_url)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role, webhook_url, created_at`,
+        [name, email, passwordHash, 'merchant', webhook_url || null]
       );
 
       const merchant = merchantRes.rows[0];
@@ -62,7 +62,7 @@ router.post('/login',
       const { email, password } = req.body;
 
       const result = await query(
-        'SELECT id, name, email, password_hash, is_active FROM merchants WHERE email = $1',
+        'SELECT id, name, email, password_hash, role, is_active FROM merchants WHERE email = $1',
         [email]
       );
 
@@ -82,7 +82,7 @@ router.post('/login',
       }
 
       const token = jwt.sign(
-        { merchantId: merchant.id, email: merchant.email },
+        { merchantId: merchant.id, email: merchant.email, role: merchant.role },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
@@ -91,7 +91,7 @@ router.post('/login',
 
       res.json({
         token,
-        merchant: { id: merchant.id, name: merchant.name, email: merchant.email },
+        merchant: { id: merchant.id, name: merchant.name, email: merchant.email, role: merchant.role },
       });
     } catch (err) {
       next(err);

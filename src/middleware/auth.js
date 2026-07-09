@@ -13,7 +13,7 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const result = await query(
-      'SELECT id, name, email, is_active FROM merchants WHERE id = $1',
+      'SELECT id, name, email, role, is_active FROM merchants WHERE id = $1',
       [decoded.merchantId]
     );
 
@@ -32,4 +32,11 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticate };
+const requireAdmin = (req, res, next) => {
+  if (!req.merchant || req.merchant.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden: Admin access required' });
+  }
+  next();
+};
+
+module.exports = { authenticate, requireAdmin };

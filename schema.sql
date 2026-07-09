@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS merchants (
   name          VARCHAR(255) NOT NULL,
   email         VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  role          VARCHAR(20) DEFAULT 'merchant',
   webhook_url   VARCHAR(512),
   is_active     BOOLEAN DEFAULT true,
   created_at    TIMESTAMPTZ DEFAULT NOW(),

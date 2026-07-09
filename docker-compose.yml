@@ -1,22 +1,6 @@
 version: '3.9'
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: payflow
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -48,27 +32,24 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
-      DB_HOST: postgres
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_HOST: redis
       ML_SERVICE_URL: http://ml-service:5001
       JWT_SECRET: dev-secret-change-in-production
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       ml-service:
         condition: service_healthy
-    command: npm run dev
+    command: npm start
 
   webhook-worker:
     build: .
     environment:
       NODE_ENV: development
-      DB_HOST: postgres
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_HOST: redis
     depends_on:
-      - postgres
       - redis
     command: node src/workers/webhookWorker.js
 
@@ -76,13 +57,10 @@ services:
     build: .
     environment:
       NODE_ENV: development
-      DB_HOST: postgres
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_HOST: redis
       RUN_RECON_ON_START: "false"
     depends_on:
-      - postgres
       - redis
     command: node src/workers/reconciliationWorker.js
 
-volumes:
-  postgres_data:
