@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  // Vite runs separately in development; the Docker image serves this build
+  // from the same Express origin in deployment.
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : window.location.origin),
 });
 
 api.interceptors.request.use((config) => {

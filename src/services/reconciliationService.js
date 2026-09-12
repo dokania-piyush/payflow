@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
  *  1. Every completed transaction has exactly 2 ledger entries (1 debit + 1 credit)
  *  2. Debit amount == Credit amount for every transaction
  *  3. Net sum of ALL ledger entries == 0 (the golden rule of double-entry bookkeeping)
- *  4. Account running balances match computed balances from ledger history
+ *  4. Account balances match opening balance plus ledger history
  *
  * Discrepancies are written to audit_discrepancies for human review.
  */
@@ -96,19 +96,22 @@ const runReconciliation = async (periodStart, periodEnd) => {
       `SELECT
          a.id,
          a.balance AS stored_balance,
-         COALESCE(
+         a.opening_balance,
+         a.opening_balance + COALESCE(
            SUM(CASE WHEN le.entry_type = 'credit' THEN le.amount
                     WHEN le.entry_type = 'debit'  THEN -le.amount END),
            0
          ) AS computed_balance
        FROM accounts a
        LEFT JOIN ledger_entries le ON le.account_id = a.id
-       GROUP BY a.id, a.balance
+       GROUP BY a.id, a.balance, a.opening_balance
        HAVING ABS(
-         a.balance - COALESCE(
+         a.balance - (
+           a.opening_balance + COALESCE(
            SUM(CASE WHEN le.entry_type = 'credit' THEN le.amount
                     WHEN le.entry_type = 'debit'  THEN -le.amount END),
            0
+           )
          )
        ) > 0.001`,
       []
@@ -118,7 +121,7 @@ const runReconciliation = async (periodStart, periodEnd) => {
       discrepancies.push({
         transaction_id: null,
         discrepancy_type: 'balance_mismatch',
-        description: `Account ${row.id}: stored ${row.stored_balance} vs computed ${row.computed_balance}`,
+        description: `Account ${row.id}: stored ${row.stored_balance} vs opening ${row.opening_balance} + ledger movements = ${row.computed_balance}`,
         expected_amount: row.computed_balance,
         actual_amount: row.stored_balance,
       });

@@ -33,10 +33,10 @@ const worker = new Worker(
     // Record attempt
     await query(
       `INSERT INTO webhook_deliveries
-         (transaction_id, merchant_id, event_type, payload, status, attempts)
-       VALUES ($1,$2,$3,$4,'pending',$5)
+         (transaction_id, merchant_id, event_type, job_id, payload, status, attempts)
+       VALUES ($1,$2,$3,$4,$5,'pending',$6)
        ON CONFLICT DO NOTHING`,
-      [transactionId, merchantId, eventType, JSON.stringify(webhookPayload), job.attemptsMade + 1]
+      [transactionId, merchantId, eventType, String(job.id), JSON.stringify(webhookPayload), job.attemptsMade + 1]
     );
 
     const controller = new AbortController();
@@ -63,8 +63,8 @@ const worker = new Worker(
       await query(
         `UPDATE webhook_deliveries
          SET status = $1, last_response = $2, updated_at = NOW()
-         WHERE transaction_id = $3 AND event_type = $4`,
-        [response.ok ? 'delivered' : 'failed', JSON.stringify(lastResponse), transactionId, eventType]
+         WHERE job_id = $3`,
+        [response.ok ? 'delivered' : 'failed', JSON.stringify(lastResponse), String(job.id)]
       );
 
       if (!response.ok) {
@@ -96,8 +96,8 @@ worker.on('failed', async (job, err) => {
     logger.error('Webhook dead-lettered — max retries exhausted', { jobId: job.id });
     await query(
       `UPDATE webhook_deliveries SET status = 'dead_lettered', updated_at = NOW()
-       WHERE transaction_id = $1 AND event_type = $2`,
-      [job.data.transactionId, job.data.eventType]
+       WHERE job_id = $1`,
+      [String(job.id)]
     ).catch(() => {});
   }
 });

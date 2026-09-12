@@ -10,8 +10,8 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const result = await query(
-      `SELECT a.id, a.currency, a.balance, a.version, a.created_at,
-              COALESCE(SUM(CASE WHEN le.entry_type = 'credit' THEN le.amount ELSE -le.amount END), 0) AS ledger_balance
+      `SELECT a.id, a.currency, a.balance, a.opening_balance, a.account_role, a.version, a.created_at,
+              a.opening_balance + COALESCE(SUM(CASE WHEN le.entry_type = 'credit' THEN le.amount ELSE -le.amount END), 0) AS ledger_balance
        FROM accounts a
        LEFT JOIN ledger_entries le ON le.account_id = a.id
        WHERE a.merchant_id = $1

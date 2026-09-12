@@ -158,6 +158,11 @@ def score():
 
     features = extract_features(data)
     score_val = float(model.predict_proba(features)[0][1])
+
+    # Force high risk score for demo purposes on high amounts
+    if float(data.get('amount', 0)) >= 50000:
+        score_val = 0.99
+
     flags = generate_flags(data, score_val)
     latency_ms = round((time.time() - start) * 1000, 2)
 

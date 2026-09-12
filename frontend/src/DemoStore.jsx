@@ -28,6 +28,8 @@ export default function DemoStore() {
       }).catch(console.error);
   }, []);
 
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
   const handlePay = async (e) => {
     e.preventDefault();
     setStatus('processing');
@@ -38,8 +40,8 @@ export default function DemoStore() {
       await api.post('/payments', {
         sender_account_id: senderId,
         receiver_account_id: receiverId,
-        amount: 299.99,
-        description: 'Order #10293 - Noise Cancelling Headphones',
+        amount: selectedProduct.price,
+        description: selectedProduct.name,
       }, {
         headers: { 'idempotency-key': idempotencyKey }
       });
@@ -84,15 +86,42 @@ export default function DemoStore() {
             <p className="mb-6 text-lg text-gray-600">
               Industry-leading noise cancellation, 30-hour battery life, and crystal clear calls.
             </p>
-            <div className="mb-8 text-3xl font-bold text-gray-900">₹299.99</div>
 
-            <button 
-              onClick={() => setShowModal(true)}
-              className="w-full rounded-lg bg-yellow-500 py-4 font-bold text-gray-900 shadow-md transition hover:bg-yellow-400 md:w-2/3"
-            >
-              Buy Now
-            </button>
-            <div className="mt-4 flex items-center text-sm text-gray-500">
+            <div className="space-y-4 md:w-2/3">
+              <div className="rounded-lg border p-4 border-gray-200 bg-white shadow-sm">
+                <div className="mb-2 flex justify-between items-center font-bold text-gray-900">
+                  <span>Standard Edition</span>
+                  <span className="text-xl">₹299.99</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedProduct({ name: 'Order #10293 - Headphones (Standard)', price: 299.99 });
+                    setShowModal(true);
+                  }}
+                  className="w-full rounded-lg bg-yellow-500 py-3 font-bold text-gray-900 shadow-sm transition hover:bg-yellow-400"
+                >
+                  Buy Standard Edition
+                </button>
+              </div>
+
+              <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 shadow-sm">
+                <div className="mb-2 flex justify-between items-center font-bold text-red-900">
+                  <span>Bulk Reseller Pack</span>
+                  <span className="text-xl">₹75,000.00</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedProduct({ name: 'Order #10294 - Headphones (Bulk Reseller Pack)', price: 75000.00 });
+                    setShowModal(true);
+                  }}
+                  className="w-full rounded-lg bg-red-600 py-3 font-bold text-white shadow-sm transition hover:bg-red-700"
+                >
+                  Buy Bulk Pack
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center text-sm text-gray-500">
               <ShieldCheck className="mr-2 h-5 w-5 text-green-500" /> Secure Payments by PayFlow
             </div>
           </div>
@@ -110,7 +139,7 @@ export default function DemoStore() {
             <div className="mb-6 flex flex-col items-center border-b pb-6 text-center">
               <div className="mb-2 text-xl font-extrabold text-blue-600">PayFlow Checkout</div>
               <div className="text-sm text-gray-500">TECHSTORE is requesting a payment</div>
-              <div className="mt-4 text-3xl font-bold">₹299.99</div>
+              <div className="mt-4 text-3xl font-bold">₹{selectedProduct?.price.toLocaleString()}</div>
             </div>
 
             {status === 'idle' && (

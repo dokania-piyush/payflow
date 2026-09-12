@@ -1,7 +1,9 @@
 const express = require('express');
+const { body, param, validationResult } = require('express-validator');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { query } = require('../config/database');
-const { webhookQueue } = require('../services/webhookService');
+const { webhookQueue, replayWebhook } = require('../services/webhookService');
+const { resolvePendingTransaction } = require('../services/paymentService');
 
 const router = express.Router();
 
@@ -51,7 +53,7 @@ router.get('/transactions', async (req, res, next) => {
   try {
     const { flagged_only } = req.query;
     
-    let sql = `SELECT t.id, t.amount, t.currency, t.status, t.risk_score, t.created_at, m.name as merchant_name 
+    let sql = `SELECT t.id, t.amount, t.currency, t.status, t.risk_score, t.risk_flags, t.created_at, m.name as merchant_name
                FROM transactions t
                JOIN merchants m ON t.merchant_id = m.id`;
                
@@ -68,12 +70,59 @@ router.get('/transactions', async (req, res, next) => {
   }
 });
 
-// 4. Retry Failed Webhooks
-router.post('/webhooks/:id/retry', async (req, res, next) => {
+// 4. Resolve Pending Transaction
+router.post('/transactions/:id/resolve',
+  param('id').isUUID(),
+  body('action').isIn(['approve', 'reject']),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const { id } = req.params;
+      const { action } = req.body;
+
+      const result = await resolvePendingTransaction({
+        transactionId: id,
+        adminId: req.merchant.id, // Assuming admin is using the merchant context for auth
+        action
+      });
+
+      if (!result.success) {
+        return res.status(result.statusCode || 400).json({ error: result.error });
+      }
+
+      res.json({ message: `Transaction successfully ${action}d.`, status: result.status });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// 5. Replay a failed/dead-lettered webhook from its persisted delivery payload.
+router.post('/webhooks/:id/retry', param('id').isUUID(), async (req, res, next) => {
   try {
-    // This requires logic to fetch the failed webhook and re-enqueue it.
-    // For simplicity in this demo, we'll just return a success mock.
-    res.json({ message: 'Webhook retry queued successfully' });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const deliveryRes = await query(
+      `SELECT id, transaction_id, merchant_id, event_type, payload, status
+       FROM webhook_deliveries
+       WHERE id = $1 AND status IN ('failed', 'dead_lettered')`,
+      [req.params.id]
+    );
+    if (!deliveryRes.rows.length) return res.status(404).json({ error: 'Failed webhook delivery not found' });
+
+    const delivery = deliveryRes.rows[0];
+    const persistedPayload = typeof delivery.payload === 'string' ? JSON.parse(delivery.payload) : delivery.payload;
+    const jobId = await replayWebhook({
+      transactionId: delivery.transaction_id,
+      merchantId: delivery.merchant_id,
+      eventType: delivery.event_type,
+      payload: persistedPayload.data || persistedPayload,
+      deliveryId: delivery.id,
+    });
+    res.status(202).json({ message: 'Webhook replay queued', jobId, replayedDeliveryId: delivery.id });
   } catch (err) {
     next(err);
   }

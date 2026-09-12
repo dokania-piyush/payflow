@@ -35,6 +35,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_HOST: redis
       ML_SERVICE_URL: http://ml-service:5001
+      ML_TIMEOUT_MS: 2000
       JWT_SECRET: dev-secret-change-in-production
     depends_on:
       redis:

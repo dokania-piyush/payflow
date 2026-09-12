@@ -28,14 +28,23 @@ router.post('/',
         return res.status(400).json({ error: 'Sender and receiver cannot be the same account' });
       }
 
-      // Verify the merchant is either the sender or the receiver
-      const accountCheck = await query(
-        'SELECT id FROM accounts WHERE id IN ($1, $2) AND merchant_id = $3',
-        [sender_account_id, receiver_account_id, req.merchant.id]
-      );
+      // Settlement safety rule: only the authenticated organization can fund a
+      // payout, and the destination must be one of its registered beneficiaries.
+      const [sourceCheck, beneficiaryCheck] = await Promise.all([
+        query(
+          `SELECT id FROM accounts
+           WHERE id = $1 AND merchant_id = $2 AND account_role = 'settlement'`,
+          [sender_account_id, req.merchant.id]
+        ),
+        query(
+          `SELECT b.id FROM beneficiaries b
+           WHERE b.payout_account_id = $1 AND b.organization_id = $2 AND b.is_active = true`,
+          [receiver_account_id, req.merchant.id]
+        ),
+      ]);
 
-      if (!accountCheck.rows.length) {
-        return res.status(403).json({ error: 'Merchant must own either the sender or receiver account' });
+      if (!sourceCheck.rows.length || !beneficiaryCheck.rows.length) {
+        return res.status(403).json({ error: 'Payouts must move from your settlement account to one of your active beneficiaries' });
       }
 
       const result = await processPayment({

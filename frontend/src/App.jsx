@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
 import Register from './Register';
-import Simulator from './Simulator';
-import DemoStore from './DemoStore';
+import PayoutBatch from './PayoutBatch';
 import MerchantDashboard from './MerchantDashboard';
 import AdminDashboard from './AdminDashboard';
 import { LogOut } from 'lucide-react';
@@ -15,8 +14,9 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
+    const name = localStorage.getItem('name');
     if (token) {
-      setAuth({ role }); // simplified restore
+      setAuth({ role, name });
     }
     setLoading(false);
   }, []);
@@ -24,6 +24,7 @@ function App() {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('name');
     setAuth(null);
   };
 
@@ -51,12 +52,8 @@ function App() {
           auth && auth.role === 'admin' ? <AdminDashboard auth={auth} /> : <Navigate to="/login" />
         } />
         
-        <Route path="/simulator" element={
-          auth ? <Simulator /> : <Navigate to="/login" />
-        } />
-        
-        <Route path="/demo-store" element={
-          auth ? <DemoStore /> : <Navigate to="/login" />
+        <Route path="/settlements" element={
+          auth && auth.role === 'merchant' ? <PayoutBatch /> : <Navigate to="/login" />
         } />
         
         <Route path="*" element={<Navigate to="/login" />} />

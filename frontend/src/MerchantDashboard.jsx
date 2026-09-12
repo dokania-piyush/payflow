@@ -25,29 +25,29 @@ export default function MerchantDashboard({ auth }) {
     <div className="min-h-screen bg-gray-50 p-8">
       <header className="mb-8 flex items-center justify-between border-b pb-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Welcome back, {auth.name}</h1>
-          <p className="text-gray-600">Here's what's happening with your business today.</p>
+          <h1 className="text-3xl font-bold text-gray-800">{auth.name || 'Organization'} Settlement Console</h1>
+          <p className="text-gray-600">Track completed payouts, review exceptions, and manage daily settlement operations.</p>
         </div>
         <button 
-          onClick={() => navigate('/demo-store')}
+          onClick={() => navigate('/settlements')}
           className="flex items-center rounded-md bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
         >
-          <CreditCard className="mr-2 h-5 w-5" /> Launch B2C Customer Demo
+          <CreditCard className="mr-2 h-5 w-5" /> Create Payout Batch
         </button>
       </header>
 
       {/* Metrics Cards */}
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Total Revenue" value={`₹${metrics.totalRevenue}`} icon={<TrendingUp className="text-blue-500" />} />
-        <MetricCard title="Transactions Today" value={metrics.transactionsToday} icon={<CheckCircle className="text-green-500" />} />
-        <MetricCard title="Success Rate" value={`${Math.round((metrics.successCount / (metrics.successCount + metrics.failedCount || 1)) * 100)}%`} icon={<CheckCircle className="text-green-500" />} />
-        <MetricCard title="Fraud Alerts" value={metrics.fraudAlerts} icon={<AlertTriangle className="text-red-500" />} />
+        <MetricCard title="Payout Volume" value={`₹${metrics.totalRevenue}`} icon={<TrendingUp className="text-blue-500" />} />
+        <MetricCard title="Payouts Today" value={metrics.transactionsToday} icon={<CheckCircle className="text-green-500" />} />
+        <MetricCard title="Completion Rate" value={`${Math.round((metrics.successCount / (metrics.successCount + metrics.failedCount || 1)) * 100)}%`} icon={<CheckCircle className="text-green-500" />} />
+        <MetricCard title="Review Alerts" value={metrics.fraudAlerts} icon={<AlertTriangle className="text-red-500" />} />
       </div>
 
       {/* Charts */}
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-gray-800">Daily Revenue Volume (7 Days)</h3>
+          <h3 className="mb-4 text-lg font-semibold text-gray-800">Daily Payout Volume (7 Days)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
@@ -62,7 +62,7 @@ export default function MerchantDashboard({ auth }) {
         </div>
         
         <div className="rounded-lg bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-gray-800">Transaction Count (7 Days)</h3>
+          <h3 className="mb-4 text-lg font-semibold text-gray-800">Payout Count (7 Days)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
@@ -79,7 +79,7 @@ export default function MerchantDashboard({ auth }) {
 
       {/* Recent Transactions Table */}
       <div className="rounded-lg bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-lg font-semibold text-gray-800">Recent Transactions</h3>
+        <h3 className="mb-4 text-lg font-semibold text-gray-800">Recent Payouts</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -97,8 +97,8 @@ export default function MerchantDashboard({ auth }) {
                   <td className="py-3 text-sm text-gray-500">{tx.id.substring(0, 8)}...</td>
                   <td className="py-3 font-medium">₹{tx.amount}</td>
                   <td className="py-3">
-                    <span className={`rounded-full px-2 py-1 text-xs ${tx.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {tx.status}
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${tx.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {tx.status === 'pending' && tx.risk_score > 0.85 ? 'Fraud Alert (Blocked)' : tx.status}
                     </span>
                   </td>
                   <td className="py-3">

@@ -29,6 +29,16 @@ export default function AdminDashboard({ auth }) {
     fetchUsers(); // refresh
   };
 
+  const resolveTransaction = async (id, action) => {
+    if (!window.confirm(`Are you sure you want to ${action} this transaction?`)) return;
+    try {
+      await api.post(`/admin/transactions/${id}/resolve`, { action });
+      fetchTransactions();
+    } catch (err) {
+      alert('Failed to resolve transaction: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   if (!health) return <div className="p-8">Loading admin panel...</div>;
 
   return (
@@ -127,7 +137,9 @@ export default function AdminDashboard({ auth }) {
                   <th className="p-3">Merchant</th>
                   <th className="p-3">Amount</th>
                   <th className="p-3">Status</th>
-                  <th className="p-3">Risk</th>
+                  <th className="p-3">Risk Score</th>
+                  <th className="p-3">ML Flags</th>
+                  <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -143,10 +155,47 @@ export default function AdminDashboard({ auth }) {
                     <td className="p-3">
                       {tx.risk_score > 0.85 ? (
                         <span className="flex items-center font-bold text-red-600">
-                          <AlertCircle className="mr-1 h-3 w-3" /> {tx.risk_score}
+                          <AlertCircle className="mr-1 h-4 w-4" /> {tx.risk_score}
                         </span>
                       ) : (
                         <span className="text-gray-500">{tx.risk_score}</span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {(() => {
+                          try {
+                            const flags = typeof tx.risk_flags === 'string' ? JSON.parse(tx.risk_flags) : (tx.risk_flags || []);
+                            if (flags.length === 0) return <span className="text-xs text-gray-400">None</span>;
+                            return flags.map((f, i) => (
+                              <span key={i} title={f.description || f} className="cursor-help rounded bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800 border border-yellow-200">
+                                {f.flag || f}
+                              </span>
+                            ));
+                          } catch(e) {
+                            return <span className="text-xs text-gray-400">Error parsing flags</span>;
+                          }
+                        })()}
+                      </div>
+                    </td>
+                    <td className="p-3 text-right">
+                      {tx.status === 'pending' ? (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => resolveTransaction(tx.id, 'approve')}
+                            className="rounded bg-green-500 px-2 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-green-600"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => resolveTransaction(tx.id, 'reject')}
+                            className="rounded bg-red-500 px-2 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-red-600"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
                   </tr>

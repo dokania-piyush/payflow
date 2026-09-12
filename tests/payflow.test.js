@@ -19,6 +19,7 @@ let merchantToken;
 let merchantId;
 let senderAccountId;
 let receiverAccountId;
+let beneficiaryId;
 
 beforeAll(async () => {
   // Register a test merchant
@@ -48,17 +49,25 @@ beforeAll(async () => {
 
   senderAccountId = accountsRes.body.accounts[0].id;
 
-  // Create a second account to receive payments
+  // Create an organization-owned beneficiary wallet. Settlement payouts may
+  // only move from the organization's settlement account to this type of wallet.
   const receiverRes = await query(
-    `INSERT INTO accounts (merchant_id, currency, balance)
-     VALUES ($1, 'INR', 0) RETURNING id`,
+    `INSERT INTO accounts (merchant_id, currency, balance, opening_balance, account_role)
+     VALUES ($1, 'INR', 0, 0, 'beneficiary_wallet') RETURNING id`,
     [merchantId]
   );
   receiverAccountId = receiverRes.rows[0].id;
+  const beneficiaryRes = await query(
+    `INSERT INTO beneficiaries (organization_id, name, beneficiary_type, payout_account_id)
+     VALUES ($1, 'Test Rider', 'rider', $2) RETURNING id`,
+    [merchantId, receiverAccountId]
+  );
+  beneficiaryId = beneficiaryRes.rows[0].id;
 });
 
 afterAll(async () => {
   // Cleanup test data
+  await query('DELETE FROM beneficiaries WHERE id = $1', [beneficiaryId]);
   await query('DELETE FROM ledger_entries WHERE transaction_id IN (SELECT id FROM transactions WHERE merchant_id = $1)', [merchantId]);
   await query('DELETE FROM transactions WHERE merchant_id = $1', [merchantId]);
   await query('DELETE FROM accounts WHERE merchant_id = $1', [merchantId]);

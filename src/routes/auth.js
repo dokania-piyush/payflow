@@ -35,10 +35,13 @@ router.post('/register',
 
       const merchant = merchantRes.rows[0];
 
-      // Create default account for the merchant
+      // Create the organization's funded settlement account for the demo.
+      // opening_balance lets reconciliation distinguish starting funds from
+      // movements recorded later in the ledger.
       await query(
-        'INSERT INTO accounts (merchant_id, currency, balance) VALUES ($1, $2, $3)',
-        [merchant.id, 'INR', 10000.00] // Seed with ₹10,000 for testing
+        `INSERT INTO accounts (merchant_id, currency, balance, opening_balance, account_role)
+         VALUES ($1, $2, $3, $3, 'settlement')`,
+        [merchant.id, 'INR', 10000.00]
       );
 
       logger.info('Merchant registered', { merchantId: merchant.id });

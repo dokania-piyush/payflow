@@ -10,8 +10,10 @@ const paymentRoutes = require('./routes/payments');
 const accountRoutes = require('./routes/accounts');
 const analyticsRoutes = require('./routes/analytics');
 const adminRoutes = require('./routes/admin');
+const settlementRoutes = require('./routes/settlements');
 const { errorHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const path = require('path');
 
 const app = express();
 
@@ -44,7 +46,8 @@ app.use('/payments', rateLimit({
 }));
 
 // Serve frontend dashboard
-app.use(express.static(require('path').join(__dirname, '../public')));
+const publicDir = path.join(__dirname, '../public');
+app.use(express.static(publicDir));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -62,6 +65,14 @@ app.use('/payments', paymentRoutes);
 app.use('/accounts', accountRoutes);
 app.use('/analytics', analyticsRoutes);
 app.use('/admin', adminRoutes);
+app.use('/settlements', settlementRoutes);
+
+// The production image serves the React build from public/. Return its entry
+// document for client-side routes such as /settlements after API routes finish.
+app.get('*', (req, res, next) => {
+  if (req.headers.accept?.includes('text/html')) return res.sendFile(path.join(publicDir, 'index.html'));
+  next();
+});
 
 // 404
 app.use((req, res) => {

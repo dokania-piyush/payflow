@@ -23,6 +23,7 @@ export default function Register({ setAuth }) {
       
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('role', res.data.merchant.role);
+      localStorage.setItem('name', res.data.merchant.name);
       setAuth(res.data.merchant);
       
       navigate('/merchant');

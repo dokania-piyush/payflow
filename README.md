@@ -1,6 +1,6 @@
-# 🚀 PayFlow - Enterprise Payment Gateway Architecture
+# 🚀 PayFlow - Internal Settlement & Payout Architecture
 
-PayFlow is a full-stack, enterprise-grade **Payment Gateway & Ledger System** designed to handle high-volume B2B2C financial transactions safely and reliably. 
+PayFlow is a full-stack **internal settlement and payout prototype** for marketplace-style organizations that pay riders, vendors, and partners safely and reliably.
 
 Built with modern architecture patterns used by companies like Stripe and Razorpay, PayFlow includes robust features like **Double-Entry Bookkeeping**, **Idempotent API Requests**, **Machine Learning Fraud Detection**, and **Asynchronous Webhooks**.
 
@@ -10,14 +10,14 @@ Built with modern architecture patterns used by companies like Stripe and Razorp
 
 ## 🏗 Architecture Overview
 
-PayFlow operates on a **B2B2C** (Business-to-Business-to-Consumer) model. 
+PayFlow operates as an internal finance layer after an organization has decided a payout is due. It is not a replacement for Razorpay, Stripe, or bank payment rails.
 
-1. **The Merchant (e.g., Zomato, Amazon):** Integrates the PayFlow REST API into their backend.
-2. **The Customer:** Buys a product on the Merchant's website.
-3. **PayFlow API:** The Merchant's server securely hits PayFlow's `POST /payments` endpoint to transfer funds from the Customer to the Merchant.
-4. **The Ledger:** PayFlow uses strict **double-entry bookkeeping** (debits and credits) to ensure money is never created or destroyed out of thin air.
-5. **Machine Learning:** Every transaction is synchronously analyzed by a Python microservice to detect anomalous/fraudulent patterns.
-6. **Webhooks:** PayFlow asynchronously notifies the Merchant's server via Redis queues that the payment was successful.
+- **Organization:** A marketplace or delivery platform integrates the API and owns a funded settlement account.
+- **Beneficiary:** A rider, vendor, or partner receives payouts in an organization-owned virtual wallet.
+- **Complete Flow:** The finance team creates a daily payout batch, then PayFlow transfers money from the organization settlement account to selected beneficiaries.
+- **Ledger:** Every completed payout creates a matching debit and credit entry for auditability.
+- **Risk review:** High-value payouts are held for an admin rather than immediately moving funds.
+- **Notifications:** Webhooks are queued after the payout commit, with retries when a recipient endpoint is unavailable.
 
 ---
 
@@ -43,9 +43,9 @@ PayFlow operates on a **B2B2C** (Business-to-Business-to-Consumer) model.
 ## ✨ Key Enterprise Features
 
 * 🏦 **Double-Entry Ledger Bookkeeping:** Every transaction creates a synchronized debit and credit entry. An automated reconciliation worker runs in the background to audit the database for discrepancies.
-* 🛡️ **Idempotent API:** Safe against network failures. If a merchant accidentally sends the same payment request twice, the Idempotency middleware intercepts it and returns the cached result, preventing double-charging.
+* 🛡️ **Idempotent Payout API:** Safe against network failures. If an organization retries the same payout request, the Idempotency middleware returns the prior result rather than creating a duplicate payout.
 * 🤖 **AI Fraud Detection:** A Python microservice assigns a risk score (0.0 to 1.0) to every transaction. High-risk transactions (>0.85) are automatically blocked or flagged for manual Admin review.
-* 🎣 **Reliable Webhooks:** Failed webhook deliveries to merchants are pushed to a Redis Queue with an exponential backoff retry strategy.
+* 🎣 **Reliable Webhooks:** Failed payout notifications are pushed to a Redis Queue with exponential backoff and can be replayed from dead-lettered delivery records.
 * 👥 **Role-Based Access Control:** Separate JWT permissions for **Admins** (who manage the system and freeze accounts) and **Merchants** (who process payments).
 
 ---
@@ -54,14 +54,14 @@ PayFlow operates on a **B2B2C** (Business-to-Business-to-Consumer) model.
 
 PayFlow includes three distinct frontends to demonstrate the complete ecosystem:
 
-1. **B2C Demo E-commerce Store (`/demo-store`)**
-   - Simulates a real customer checkout experience on a merchant's website. Features a sleek PayFlow Checkout Widget overlay that processes live transactions.
+1. **Settlement Operations Console (`/merchant`)**
+   - Shows payout volume, processing results, and risk exceptions.
 
-2. **Merchant Dashboard (`/merchant`)**
-   - The analytics hub for businesses. Displays Total Revenue, Transactions Today, Success/Failure rates, and interactive volume charts.
+2. **Payout Batch Desk (`/settlements`)**
+   - Creates rider/vendor beneficiaries, groups amounts due into a batch, and processes that batch from the organization settlement account.
 
 3. **Admin Control Center (`/admin`)**
-   - The internal tool for PayFlow staff. Allows admins to monitor database/queue health, view global flagged transactions, and freeze/unfreeze malicious merchant accounts.
+   - The internal tool for PayFlow staff. Allows admins to monitor database/queue health and approve/reject held payouts.
 
 ---
 
@@ -91,6 +91,10 @@ npm install
 npm run dev
 ```
 
+The production Docker image builds this React interface and serves it from the
+same origin as the API. During local Vite development it calls the API on port
+`3000`.
+
 ### 4. Access the App
 Open **http://localhost:5173** in your browser.
 - **Admin Login:** `admin@payflow.com` / `admin123`
@@ -102,7 +106,7 @@ Open **http://localhost:5173** in your browser.
 
 ```
 payflow/
-├── frontend/                 # React UI (Dashboards & B2C Demo)
+├── frontend/                 # React settlement dashboard and payout-batch desk
 ├── ml-service/               # Python Flask Fraud Detection Microservice
 ├── src/
 │   ├── config/               # Database and environment configurations

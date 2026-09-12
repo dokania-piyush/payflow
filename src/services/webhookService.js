@@ -31,4 +31,14 @@ const enqueueWebhook = async ({ transactionId, merchantId, eventType, payload })
   }
 };
 
-module.exports = { enqueueWebhook, webhookQueue };
+const replayWebhook = async ({ transactionId, merchantId, eventType, payload, deliveryId }) => {
+  const job = await webhookQueue.add(
+    eventType,
+    { transactionId, merchantId, eventType, payload, replayedFrom: deliveryId, enqueuedAt: new Date().toISOString() },
+    { jobId: `replay:${deliveryId}:${Date.now()}` }
+  );
+  logger.info('Dead-letter webhook replay queued', { deliveryId, jobId: job.id, transactionId });
+  return job.id;
+};
+
+module.exports = { enqueueWebhook, replayWebhook, webhookQueue };

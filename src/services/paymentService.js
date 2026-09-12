@@ -260,4 +260,121 @@ const reverseTransaction = async ({ transactionId, merchantId, reason }) => {
   }
 };
 
-module.exports = { processPayment, reverseTransaction };
+/**
+ * resolvePendingTransaction — approves or rejects a transaction held for manual review.
+ */
+const resolvePendingTransaction = async ({ transactionId, adminId, action }) => {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    const txnRes = await client.query(
+      'SELECT * FROM transactions WHERE id = $1 FOR UPDATE',
+      [transactionId]
+    );
+
+    if (!txnRes.rows.length) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'Transaction not found', statusCode: 404 };
+    }
+
+    const txn = txnRes.rows[0];
+
+    if (txn.status !== 'pending') {
+      await client.query('ROLLBACK');
+      return { success: false, error: `Transaction is not pending (current status: ${txn.status})`, statusCode: 400 };
+    }
+
+    if (action === 'reject') {
+      await client.query(
+        `UPDATE transactions SET status = 'failed', description = CONCAT(description, ' (Rejected by Admin)'), updated_at = NOW() WHERE id = $1`,
+        [transactionId]
+      );
+      await client.query(
+        `UPDATE payouts
+         SET status = 'failed', failure_reason = 'Rejected by Admin', updated_at = NOW()
+         WHERE transaction_id = $1`,
+        [transactionId]
+      );
+      await client.query('COMMIT');
+      logger.info('Pending transaction rejected by admin', { transactionId, adminId });
+
+      await enqueueWebhook({
+        transactionId,
+        merchantId: txn.merchant_id,
+        eventType: 'payment.failed',
+        payload: { transactionId, amount: txn.amount, status: 'failed', reason: 'Rejected by Admin' },
+      });
+
+      return { success: true, status: 'failed' };
+    }
+
+    if (action === 'approve') {
+      // ── Lock accounts and process the ledger ──
+      const [senderRes, receiverRes] = await Promise.all([
+        client.query('SELECT id, balance, version FROM accounts WHERE id = $1 FOR UPDATE', [txn.sender_account_id]),
+        client.query('SELECT id, balance, version FROM accounts WHERE id = $1 FOR UPDATE', [txn.receiver_account_id]),
+      ]);
+
+      const sender = senderRes.rows[0];
+      const receiver = receiverRes.rows[0];
+
+      if (parseFloat(sender.balance) < parseFloat(txn.amount)) {
+        await client.query('ROLLBACK');
+        return { success: false, error: 'Sender has insufficient funds to approve this transaction', statusCode: 422 };
+      }
+
+      const newSenderBalance = parseFloat(sender.balance) - parseFloat(txn.amount);
+      const newReceiverBalance = parseFloat(receiver.balance) + parseFloat(txn.amount);
+
+      await client.query(
+        'UPDATE accounts SET balance = $1, version = version + 1, updated_at = NOW() WHERE id = $2',
+        [newSenderBalance, txn.sender_account_id]
+      );
+      await client.query(
+        'UPDATE accounts SET balance = $1, version = version + 1, updated_at = NOW() WHERE id = $2',
+        [newReceiverBalance, txn.receiver_account_id]
+      );
+
+      await client.query(
+        `INSERT INTO ledger_entries (transaction_id, account_id, entry_type, amount, running_balance)
+         VALUES ($1, $2, 'debit', $3, $4), ($1, $5, 'credit', $3, $6)`,
+        [transactionId, txn.sender_account_id, txn.amount, newSenderBalance,
+         txn.receiver_account_id, newReceiverBalance]
+      );
+
+      await client.query(
+        `UPDATE transactions SET status = 'completed', updated_at = NOW() WHERE id = $1`,
+        [transactionId]
+      );
+      await client.query(
+        `UPDATE payouts SET status = 'completed', updated_at = NOW() WHERE transaction_id = $1`,
+        [transactionId]
+      );
+
+      await client.query('COMMIT');
+      logger.info('Pending transaction approved by admin', { transactionId, adminId });
+
+      await enqueueWebhook({
+        transactionId,
+        merchantId: txn.merchant_id,
+        eventType: 'payment.completed',
+        payload: { transactionId, amount: txn.amount, currency: txn.currency, status: 'completed' },
+      });
+
+      return { success: true, status: 'completed' };
+    }
+
+    await client.query('ROLLBACK');
+    return { success: false, error: 'Invalid action', statusCode: 400 };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error('Failed to resolve pending transaction', { error: err.message });
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = { processPayment, reverseTransaction, resolvePendingTransaction };
