@@ -52,7 +52,8 @@ const seed = async () => {
   const adminRes = await query(
     `INSERT INTO merchants (name, email, password_hash, role)
      VALUES ($1,$2,$3,'admin')
-     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = 'admin'
+     ON CONFLICT (email) DO UPDATE
+       SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash, role = 'admin'
      RETURNING id, email`,
     ['Admin', 'admin@payflow.com', adminHash]
   );
@@ -61,7 +62,8 @@ const seed = async () => {
   const organizationRes = await query(
     `INSERT INTO merchants (name, email, password_hash)
      VALUES ($1,$2,$3)
-     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+     ON CONFLICT (email) DO UPDATE
+       SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash
      RETURNING id, email`,
     ['SwiftEats Operations', 'demo@acme.com', orgHash]
   );
